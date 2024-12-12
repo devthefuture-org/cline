@@ -61,6 +61,8 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	const [showScrollToBottom, setShowScrollToBottom] = useState(false)
 	const [isAtBottom, setIsAtBottom] = useState(false)
 	const [approveAll, setApproveAll] = useState(false)
+	const [approveExceptCommand, setApproveExceptCommand] = useState(false)
+
 
 	// UI layout depends on the last 2 messages
 	// (since it relies on the content of these messages, we are deep comparing. i.e. the button state after hitting button sets enableButtons to false, and this effect otherwise would have to true again even if messages didn't change
@@ -676,13 +678,17 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	)
 
 	useEffect(() => {
-		if (approveAll && enableButtons && primaryButtonText) {
-			const autoApproveTexts = ["Run Command", "Proceed While Running", "Approve", "Save"]
-			if (autoApproveTexts.includes(primaryButtonText)) {
-				handlePrimaryButtonClick()
-			}
-		}
-	}, [approveAll, enableButtons, primaryButtonText, handlePrimaryButtonClick])
+    if ((approveAll || approveExceptCommand) && enableButtons && primaryButtonText) {
+        const autoApproveTexts = ["Proceed While Running", "Approve", "Save"]
+        const shouldAutoApprove = approveAll ? 
+            autoApproveTexts.concat(["Run Command"]).includes(primaryButtonText) :
+            autoApproveTexts.includes(primaryButtonText)
+        
+        if (shouldAutoApprove) {
+            handlePrimaryButtonClick()
+        }
+    }
+	}, [approveAll, approveExceptCommand, enableButtons, primaryButtonText, handlePrimaryButtonClick])
 
 	return (
 		<div
@@ -814,12 +820,30 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 									{isStreaming ? "Cancel" : secondaryButtonText}
 								</VSCodeButton>
 							)}
-							<VSCodeCheckbox
-								style={{ marginLeft: "10px" }}
-								checked={approveAll}
-								onChange={(e) => setApproveAll((e.target as HTMLInputElement).checked)}>
-								Auto-approve
-							</VSCodeCheckbox>
+							<div style={{ marginLeft: "10px", display: "flex", gap: "10px" }}>
+									<VSCodeCheckbox
+											checked={approveAll}
+											onChange={(e) => {
+													const checked = (e.target as HTMLInputElement).checked
+													setApproveAll(checked)
+													if (checked) {
+															setApproveExceptCommand(false)
+													}
+											}}>
+											Auto-approve all
+									</VSCodeCheckbox>
+									<VSCodeCheckbox
+											checked={approveExceptCommand}
+											onChange={(e) => {
+													const checked = (e.target as HTMLInputElement).checked
+													setApproveExceptCommand(checked)
+													if (checked) {
+															setApproveAll(false)
+													}
+											}}>
+											Auto-approve except commands
+									</VSCodeCheckbox>
+							</div>
 						</div>
 					)}
 				</>
