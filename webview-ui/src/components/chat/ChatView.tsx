@@ -1,4 +1,4 @@
-import { VSCodeButton, VSCodeLink, VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
+import { VSCodeButton, VSCodeLink } from "@vscode/webview-ui-toolkit/react"
 import debounce from "debounce"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useDeepCompareEffect, useEvent, useMount } from "react-use"
@@ -24,6 +24,26 @@ import BrowserSessionRow from "./BrowserSessionRow"
 import ChatRow from "./ChatRow"
 import ChatTextArea from "./ChatTextArea"
 import TaskHeader from "./TaskHeader"
+
+const ScrollToBottomButton = styled.div`
+	background-color: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 55%, transparent);
+	border-radius: 3px;
+	overflow: hidden;
+	cursor: pointer;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex: 1;
+	height: 25px;
+
+	&:hover {
+		background-color: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 90%, transparent);
+	}
+
+	&:active {
+		background-color: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 70%, transparent);
+	}
+`
 
 interface ChatViewProps {
 	isHidden: boolean
@@ -62,6 +82,17 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	const [isAtBottom, setIsAtBottom] = useState(false)
 	const [approveAll, setApproveAll] = useState(false)
 	const [approveExceptCommand, setApproveExceptCommand] = useState(false)
+	const [approveCommand, setApproveCommand] = useState(false)  // For "Run Command"
+	const [approveSave, setApproveSave] = useState(false)       // For "Save" file operations
+	const [approveApprove, setApproveApprove] = useState(false) // For "Approve" browser actions
+	const [approveProceed, setApproveProceed] = useState(false) // For "Proceed While Running"
+
+	const [autoScroll, setAutoScroll] = useState(true) // Keep this for now as initial state
+
+	const handleAutoScrollChange = useCallback((value: boolean) => {
+		setAutoScroll(value)  // Update local state immediately for responsive UI
+		vscode.postMessage({ type: "setAutoScroll", bool: value })
+	}, [])
 
 
 	// UI layout depends on the last 2 messages
@@ -355,6 +386,9 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		(e: MessageEvent) => {
 			const message: ExtensionMessage = e.data
 			switch (message.type) {
+				case "updateAutoScroll":
+					setAutoScroll(!!message.value)
+					break
 				case "action":
 					switch (message.action!) {
 						case "didBecomeVisible":
@@ -385,7 +419,6 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 							break
 					}
 			}
-			// textAreaRef.current is not explicitly required here since react gaurantees that ref will be stable across re-renders, and we're not using its value but its reference.
 		},
 		[
 			isHidden,
@@ -678,30 +711,46 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	)
 
 	useEffect(() => {
-    if ((approveAll || approveExceptCommand) && enableButtons && primaryButtonText) {
-        const autoApproveTexts = ["Proceed While Running", "Approve", "Save"]
-        const shouldAutoApprove = approveAll ? 
-            autoApproveTexts.concat(["Run Command"]).includes(primaryButtonText) :
-            autoApproveTexts.includes(primaryButtonText)
-        
+    if ((approveAll || approveExceptCommand || approveCommand || approveSave || approveApprove || approveProceed) && enableButtons && primaryButtonText) {
+        const shouldAutoApprove = (() => {
+            if (approveAll) {
+                return true // Approve everything
+            }
+            if (approveExceptCommand) {
+                return primaryButtonText !== "Run Command" // Everything except commands
+            }
+            // Individual controls
+            switch (primaryButtonText) {
+                case "Run Command":
+                    return approveCommand
+                case "Save":
+                    return approveSave
+                case "Approve":
+                    return approveApprove
+                case "Proceed While Running":
+                    return approveProceed
+                default:
+                    return false
+            }
+        })()
+
         if (shouldAutoApprove) {
             handlePrimaryButtonClick()
         }
     }
-	}, [approveAll, approveExceptCommand, enableButtons, primaryButtonText, handlePrimaryButtonClick])
+	}, [approveAll, approveExceptCommand, approveCommand, approveSave, approveApprove, approveProceed, enableButtons, primaryButtonText, handlePrimaryButtonClick])
 
 	return (
-		<div
-			style={{
-				position: "fixed",
-				top: 0,
-				left: 0,
-				right: 0,
-				bottom: 0,
-				display: isHidden ? "none" : "flex",
-				flexDirection: "column",
-				overflow: "hidden",
-			}}>
+		<div style={{
+			position: "fixed",
+			top: 0,
+			left: 0,
+			right: 0,
+			bottom: 0,
+			display: isHidden ? "none" : "flex",
+			flexDirection: "column",
+			overflow: "hidden",
+		}}>
 			{task ? (
 				<TaskHeader
 					task={task}
@@ -712,6 +761,54 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 					cacheReads={apiMetrics.totalCacheReads}
 					totalCost={apiMetrics.totalCost}
 					onClose={handleTaskCloseButtonClick}
+					approveAll={approveAll}
+					approveExceptCommand={approveExceptCommand}
+					onApproveAllChange={(checked) => {
+						setApproveAll(checked)
+						if (checked) {
+							setApproveExceptCommand(false)
+						}
+					}}
+					onApproveExceptCommandChange={(checked) => {
+						setApproveExceptCommand(checked)
+						if (checked) {
+							setApproveAll(false)
+						}
+					}}
+					approveCommand={approveCommand}
+					approveSave={approveSave}
+					approveApprove={approveApprove}
+					approveProceed={approveProceed}
+					onApproveCommandChange={(checked) => {
+							setApproveCommand(checked)
+							if (checked) {
+									setApproveAll(false)
+									setApproveExceptCommand(false)
+							}
+					}}
+					onApproveSaveChange={(checked) => {
+							setApproveSave(checked)
+							if (checked) {
+									setApproveAll(false)
+									setApproveExceptCommand(false)
+							}
+					}}
+					onApproveApproveChange={(checked) => {
+							setApproveApprove(checked)
+							if (checked) {
+									setApproveAll(false)
+									setApproveExceptCommand(false)
+							}
+					}}
+					onApproveProceedChange={(checked) => {
+							setApproveProceed(checked)
+							if (checked) {
+									setApproveAll(false)
+									setApproveExceptCommand(false)
+							}
+					}}
+					autoScroll={autoScroll}
+					onAutoScrollChange={handleAutoScrollChange}
 				/>
 			) : (
 				<div
@@ -820,30 +917,6 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 									{isStreaming ? "Cancel" : secondaryButtonText}
 								</VSCodeButton>
 							)}
-							<div style={{ marginLeft: "10px", display: "flex", gap: "10px" }}>
-									<VSCodeCheckbox
-											checked={approveAll}
-											onChange={(e) => {
-													const checked = (e.target as HTMLInputElement).checked
-													setApproveAll(checked)
-													if (checked) {
-															setApproveExceptCommand(false)
-													}
-											}}>
-											Auto-approve all
-									</VSCodeCheckbox>
-									<VSCodeCheckbox
-											checked={approveExceptCommand}
-											onChange={(e) => {
-													const checked = (e.target as HTMLInputElement).checked
-													setApproveExceptCommand(checked)
-													if (checked) {
-															setApproveAll(false)
-													}
-											}}>
-											Auto-approve except commands
-									</VSCodeCheckbox>
-							</div>
 						</div>
 					)}
 				</>
@@ -868,25 +941,5 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		</div>
 	)
 }
-
-const ScrollToBottomButton = styled.div`
-	background-color: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 55%, transparent);
-	border-radius: 3px;
-	overflow: hidden;
-	cursor: pointer;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	flex: 1;
-	height: 25px;
-
-	&:hover {
-		background-color: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 90%, transparent);
-	}
-
-	&:active {
-		background-color: color-mix(in srgb, var(--vscode-toolbar-hoverBackground) 70%, transparent);
-	}
-`
 
 export default ChatView

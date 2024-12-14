@@ -485,6 +485,17 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 						}
 
 						break
+						case "setAutoScroll":
+							// Execute the command we registered in extension.ts
+							await vscode.commands.executeCommand("cline.setAutoScroll", message.bool)
+							// Broadcast the change to all webviews
+							ClineProvider.activeInstances.forEach((provider) => {
+									provider.postMessageToWebview({ 
+											type: "updateAutoScroll", 
+											value: message.bool 
+									})
+							})
+							break
 					// Add more switch case statements here as more webview message commands
 					// are created within the webview context (i.e. inside media/main.js)
 				}

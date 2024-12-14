@@ -7,6 +7,7 @@ import { formatResponse } from "../../core/prompts/responses"
 import { DecorationController } from "./DecorationController"
 import * as diff from "diff"
 import { diagnosticsToProblemsString, getNewDiagnostics } from "../diagnostics"
+import { AutoScrollState } from "../../shared/AutoScrollState"
 
 export const DIFF_VIEW_URI_SCHEME = "cline-diff"
 
@@ -112,8 +113,10 @@ export class DiffViewProvider {
 			// Update decorations
 			this.activeLineController.setActiveLine(currentLine)
 			this.fadedOverlayController.updateOverlayAfterLine(currentLine, document.lineCount)
-			// Scroll to the current line
-			this.scrollEditorToLine(currentLine)
+			if (AutoScrollState.get()) {
+				// Scroll to the current line
+				this.scrollEditorToLine(currentLine)
+			}
 		}
 		// Update the streamedLines with the new accumulated content
 		this.streamedLines = accumulatedLines
@@ -307,26 +310,13 @@ export class DiffViewProvider {
 	}
 
 	private scrollEditorToLine(line: number) {
-		if (this.activeDiffEditor && this.isScrolledToBottom()) {
+		if (this.activeDiffEditor) {
 			const scrollLine = line + 4
 			this.activeDiffEditor.revealRange(
 				new vscode.Range(scrollLine, 0, scrollLine, 0),
 				vscode.TextEditorRevealType.InCenter,
 			)
 		}
-	}
-
-	private isScrolledToBottom(): boolean {
-		if (!this.activeDiffEditor) {
-			return false
-		}
-		const visibleRanges = this.activeDiffEditor.visibleRanges
-		if (visibleRanges.length === 0) {
-			return false
-		}
-		const lastVisibleRange = visibleRanges[visibleRanges.length - 1]
-		const lastLine = this.activeDiffEditor.document.lineCount - 1
-		return lastVisibleRange.end.line >= lastLine
 	}
 
 	scrollToFirstDiff() {

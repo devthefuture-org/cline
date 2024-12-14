@@ -6,6 +6,7 @@ import { ClineProvider } from "./core/webview/ClineProvider"
 import { createClineAPI } from "./exports"
 import "./utils/path" // necessary to have access to String.prototype.toPosix
 import { DIFF_VIEW_URI_SCHEME } from "./integrations/editor/DiffViewProvider"
+import { AutoScrollState } from "./shared/AutoScrollState"
 
 /*
 Built using https://github.com/microsoft/vscode-webview-ui-toolkit
@@ -26,12 +27,22 @@ export function activate(context: vscode.ExtensionContext) {
 
 	outputChannel.appendLine("Cline extension activated")
 
+	// Initialize AutoScrollState
+	AutoScrollState.initialize(context)
+
 	const sidebarProvider = new ClineProvider(context, outputChannel)
 
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ClineProvider.sideBarId, sidebarProvider, {
 			webviewOptions: { retainContextWhenHidden: true },
 		}),
+	)
+
+	// Register auto scroll command
+	context.subscriptions.push(
+		vscode.commands.registerCommand("cline.setAutoScroll", async (value: boolean) => {
+			await AutoScrollState.set(value, context)
+		})
 	)
 
 	context.subscriptions.push(

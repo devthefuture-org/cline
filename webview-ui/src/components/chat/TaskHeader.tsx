@@ -1,3 +1,4 @@
+import AutoApproveControls from "./AutoApproveControls"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import React, { memo, useEffect, useMemo, useRef, useState } from "react"
 import { useWindowSize } from "react-use"
@@ -17,6 +18,20 @@ interface TaskHeaderProps {
 	cacheReads?: number
 	totalCost: number
 	onClose: () => void
+	approveAll: boolean
+	approveExceptCommand: boolean
+	approveCommand: boolean
+	approveSave: boolean
+	approveApprove: boolean
+	approveProceed: boolean
+	autoScroll: boolean
+	onApproveAllChange: (checked: boolean) => void
+	onApproveExceptCommandChange: (checked: boolean) => void
+	onApproveCommandChange: (checked: boolean) => void
+	onApproveSaveChange: (checked: boolean) => void
+	onApproveApproveChange: (checked: boolean) => void
+	onApproveProceedChange: (checked: boolean) => void
+	onAutoScrollChange: (checked: boolean) => void
 }
 
 const TaskHeader: React.FC<TaskHeaderProps> = ({
@@ -28,6 +43,20 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({
 	cacheReads,
 	totalCost,
 	onClose,
+	approveAll,
+	approveExceptCommand,
+	approveCommand,
+	approveSave,
+	approveApprove,
+	approveProceed,
+	autoScroll,
+	onApproveAllChange,
+	onApproveExceptCommandChange,
+	onApproveCommandChange,
+	onApproveSaveChange,
+	onApproveApproveChange,
+	onApproveProceedChange,
+	onAutoScrollChange,
 }) => {
 	const { apiConfiguration } = useExtensionState()
 	const [isTaskExpanded, setIsTaskExpanded] = useState(true)
@@ -171,6 +200,22 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({
 							${totalCost?.toFixed(4)}
 						</div>
 					)}
+					<AutoApproveControls
+						approveAll={approveAll}
+						approveExceptCommand={approveExceptCommand}
+						approveCommand={approveCommand}
+						approveSave={approveSave}
+						approveApprove={approveApprove}
+						approveProceed={approveProceed}
+						autoScroll={autoScroll}
+						onApproveAllChange={onApproveAllChange}
+						onApproveExceptCommandChange={onApproveExceptCommandChange}
+						onApproveCommandChange={onApproveCommandChange}
+						onApproveSaveChange={onApproveSaveChange}
+						onApproveApproveChange={onApproveApproveChange}
+						onApproveProceedChange={onApproveProceedChange}
+						onAutoScrollChange={onAutoScrollChange}
+					/>
 					<VSCodeButton appearance="icon" onClick={onClose} style={{ marginLeft: 6, flexShrink: 0 }}>
 						<span className="codicon codicon-close"></span>
 					</VSCodeButton>
